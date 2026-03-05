@@ -179,6 +179,8 @@ if not a_corriger:
 if st.button("⚡ Appliquer les corrections", type="primary"):
 
     nb_corrections = 0
+    contrats_corriges = []
+    contrats_non_corriges = list(introuvable)  # déjà connus avant correction
 
     for assignment in assignments:
         order_el = assignment.find(".//hr:OrderId/hr:IdValue", ns)
@@ -193,13 +195,22 @@ if st.button("⚡ Appliquer les corrections", type="primary"):
         if not modele_nouveau:
             continue
 
+        modele_avant = None
         # Corriger toutes les balises MODELE de ce contrat
         for el in assignment.iter():
             tag = el.tag.split("}")[-1] if "}" in el.tag else el.tag
             if tag == "IdValue" and el.get("name") == "MODELE":
+                if modele_avant is None:
+                    modele_avant = el.text.strip() if el.text else "?"
                 if el.text and el.text.strip() != modele_nouveau:
                     el.text = modele_nouveau
                     nb_corrections += 1
+
+        contrats_corriges.append({
+            "order_id": order_id_raw,
+            "avant": modele_avant or "?",
+            "apres": modele_nouveau
+        })
 
     # Re-sérialiser en ISO-8859-1
     try:
@@ -213,7 +224,25 @@ if st.button("⚡ Appliquer les corrections", type="primary"):
         st.error(f"Erreur lors de la sérialisation : {e}")
         st.stop()
 
-    st.success(f"✅ {nb_corrections} balise(s) corrigée(s) dans {len(a_corriger)} contrat(s)")
+    st.success(f"✅ {nb_corrections} balise(s) corrigée(s) dans {len(contrats_corriges)} contrat(s)")
+
+    # Détail des contrats corrigés
+    if contrats_corriges:
+        st.subheader("✅ Contrats corrigés")
+        st.dataframe(
+            [{"N° Commande": c["order_id"], "Avant": c["avant"], "Après": c["apres"]} for c in contrats_corriges],
+            use_container_width=True,
+            hide_index=True
+        )
+
+    # Détail des contrats non corrigés
+    if contrats_non_corriges:
+        st.subheader("⚠️ Contrats non corrigés (commande absente du JSON GitHub)")
+        st.dataframe(
+            [{"N° Commande": c["order_id"], "Modèle actuel": c["modele_actuel"], "Raison": "Commande introuvable dans GitHub"} for c in contrats_non_corriges],
+            use_container_width=True,
+            hide_index=True
+        )
 
     # Téléchargement
     nom_fichier = uploaded_file.name
