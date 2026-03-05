@@ -25,8 +25,21 @@ def charger_commandes():
         r.raise_for_status()
         data = r.json()
         commandes = data.get("commandes", [])
-        # Dictionnaire numCommande -> modeleHoraire (dernière valeur gagne si doublon)
-        return {c["numCommande"].lstrip("0") or c["numCommande"]: c["modeleHoraire"]
+
+        def nettoyer_modele(valeur):
+            # Le modèle est toujours répété 2 fois : "X - X" ou "A - B - A - B"
+            # On cherche le séparateur " - " qui divise la chaîne en deux parties égales
+            valeur = re.sub(r'\s{2,}', ' ', valeur).strip()
+            separateurs = [m.start() for m in re.finditer(r'\s*-\s*', valeur)]
+            for pos in separateurs:
+                premiere = valeur[:pos].strip()
+                reste = valeur[pos:].strip().lstrip('-').strip()
+                if reste == premiere:
+                    return premiere
+            # Fallback : couper au milieu
+            return valeur[:len(valeur)//2].strip().rstrip(' -').strip()
+
+        return {c["numCommande"].lstrip("0") or c["numCommande"]: nettoyer_modele(c["modeleHoraire"])
                 for c in commandes if c.get("numCommande") and c.get("modeleHoraire")}
     except Exception as e:
         st.error(f"Erreur chargement GitHub : {e}")
