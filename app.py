@@ -90,6 +90,12 @@ st.write(f"**{len(assignments)} contrat(s) trouvé(s) dans le fichier**")
 corrections = []  # liste de dicts {order_id, modele_actuel, modele_nouveau, statut}
 
 for assignment in assignments:
+    # Récupérer numéro de contrat
+    assign_id_el = assignment.find("hr:AssignmentId/hr:IdValue", ns)
+    if assign_id_el is None:
+        assign_id_el = assignment.find("AssignmentId/IdValue")
+    contrat_id = assign_id_el.text.strip() if assign_id_el is not None else "—"
+
     # Récupérer OrderId
     order_el = assignment.find(".//hr:OrderId/hr:IdValue", ns)
     if order_el is None:
@@ -124,6 +130,7 @@ for assignment in assignments:
         statut = "commande_introuvable"
 
     corrections.append({
+        "contrat_id": contrat_id,
         "order_id": order_id_raw,
         "modele_actuel": modele_actuel,
         "modele_nouveau": modele_nouveau or "—",
@@ -151,6 +158,7 @@ if a_corriger:
     data_table = []
     for c in a_corriger:
         data_table.append({
+            "N° Contrat": c["contrat_id"],
             "N° Commande": c["order_id"],
             "Modèle actuel": c["modele_actuel"],
             "→ Nouveau modèle": c["modele_nouveau"]
@@ -160,12 +168,12 @@ if a_corriger:
 if introuvable:
     with st.expander(f"⚠️ {len(introuvable)} contrat(s) sans correspondance dans GitHub"):
         for c in introuvable:
-            st.write(f"- Commande **{c['order_id']}** — modèle actuel : `{c['modele_actuel']}`")
+            st.write(f"- Contrat **{c['contrat_id']}** | Commande **{c['order_id']}** — modèle actuel : `{c['modele_actuel']}`")
 
 if deja_correct:
     with st.expander(f"⚪ {len(deja_correct)} contrat(s) déjà corrects"):
         for c in deja_correct:
-            st.write(f"- Commande **{c['order_id']}** — modèle : `{c['modele_actuel']}`")
+            st.write(f"- Contrat **{c['contrat_id']}** | Commande **{c['order_id']}** — modèle : `{c['modele_actuel']}`")
 
 st.divider()
 
@@ -195,8 +203,12 @@ if st.button("⚡ Appliquer les corrections", type="primary"):
         if not modele_nouveau:
             continue
 
+        assign_id_el = assignment.find("hr:AssignmentId/hr:IdValue", ns)
+        if assign_id_el is None:
+            assign_id_el = assignment.find("AssignmentId/IdValue")
+        contrat_id = assign_id_el.text.strip() if assign_id_el is not None else "—"
+
         modele_avant = None
-        # Corriger toutes les balises MODELE de ce contrat
         for el in assignment.iter():
             tag = el.tag.split("}")[-1] if "}" in el.tag else el.tag
             if tag == "IdValue" and el.get("name") == "MODELE":
@@ -207,6 +219,7 @@ if st.button("⚡ Appliquer les corrections", type="primary"):
                     nb_corrections += 1
 
         contrats_corriges.append({
+            "contrat_id": contrat_id,
             "order_id": order_id_raw,
             "avant": modele_avant or "?",
             "apres": modele_nouveau
@@ -230,7 +243,7 @@ if st.button("⚡ Appliquer les corrections", type="primary"):
     if contrats_corriges:
         st.subheader("✅ Contrats corrigés")
         st.dataframe(
-            [{"N° Commande": c["order_id"], "Avant": c["avant"], "Après": c["apres"]} for c in contrats_corriges],
+            [{"N° Contrat": c["contrat_id"], "N° Commande": c["order_id"], "Avant": c["avant"], "Après": c["apres"]} for c in contrats_corriges],
             use_container_width=True,
             hide_index=True
         )
@@ -239,7 +252,7 @@ if st.button("⚡ Appliquer les corrections", type="primary"):
     if contrats_non_corriges:
         st.subheader("⚠️ Contrats non corrigés (commande absente du JSON GitHub)")
         st.dataframe(
-            [{"N° Commande": c["order_id"], "Modèle actuel": c["modele_actuel"], "Raison": "Commande introuvable dans GitHub"} for c in contrats_non_corriges],
+            [{"N° Contrat": c["contrat_id"], "N° Commande": c["order_id"], "Modèle actuel": c["modele_actuel"], "Raison": "Commande introuvable dans GitHub"} for c in contrats_non_corriges],
             use_container_width=True,
             hide_index=True
         )
