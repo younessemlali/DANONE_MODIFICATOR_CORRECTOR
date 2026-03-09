@@ -27,7 +27,6 @@ def charger_commandes():
         commandes = data.get("commandes", [])
 
         def nettoyer_modele(valeur):
-            # Le modèle est toujours répété 2 fois : "X - X" ou "A - B - A - B"
             valeur = re.sub(r'\s{2,}', ' ', valeur).strip()
             # Cas 1 : répétition exacte ex "Bailleul - Bailleul"
             separateurs = [m.start() for m in re.finditer(r'\s*-\s*', valeur)]
@@ -37,13 +36,12 @@ def charger_commandes():
                 if reste == premiere:
                     return premiere
             # Cas 2 : répétition non identique ex "Brive - Jour - Brive - Journée"
-            # On coupe avant la 2ème occurrence du premier mot
             premier_mot = valeur.split()[0]
             occurrences = [m.start() for m in re.finditer(r'(?<!\w)' + re.escape(premier_mot) + r'(?!\w)', valeur, re.IGNORECASE)]
             if len(occurrences) >= 2:
-                return valeur[:occurrences[1]].strip().rstrip('-').strip()
-            # Fallback : couper au milieu
-            return valeur[:len(valeur)//2].strip().rstrip(' -').strip()
+                return valeur[:occurrences[1]].strip().rstrip(' -').strip()
+            # Cas 3 : déjà nettoyé, retourner tel quel
+            return valeur
 
         return {c["numCommande"].lstrip("0") or c["numCommande"]: nettoyer_modele(c["modeleHoraire"])
                 for c in commandes if c.get("numCommande") and c.get("modeleHoraire")}
